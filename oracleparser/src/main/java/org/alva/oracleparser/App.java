@@ -1,5 +1,6 @@
 package org.alva.oracleparser;
 import java.sql.*;
+import java.util.regex.*;
 import java.util.ArrayList;
 
 
@@ -22,8 +23,8 @@ public class App
 			
             //Recorrer los packages
 			for (String obj : objs) {
-				String ddl = getDDL(conn, obj);
-				parsePkg(obj);
+				String ddl = getDDL(conn, "PACKAGE", obj);
+				parsePkg(obj, ddl);
 			}
 			
 			
@@ -38,9 +39,28 @@ public class App
         
     }
 
-	public static String getDDL(Connection conn,String obj) {
-		// TODO Auto-generated method stub
-		return null;
+	public static String getDDL(Connection conn, String tipo, String obj){
+		String labels_query = "select DBMS_METADATA.GET_DDL(?,?) from DUAL"; //PACKAGE,HAS_PKG_SFC
+		String ddl = null;
+		try {
+			PreparedStatement statement = conn.prepareStatement(labels_query);
+			statement.setString(1, tipo);
+			statement.setString(2, obj);
+			ResultSet r = statement.executeQuery();
+			while(r.next()){
+				ddl = r.getString(1);
+			}	
+			
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally{
+			try {
+				conn.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+		return ddl;
 	}
 
 	public static Connection getConn(String bd, String usuario) throws SQLException {
@@ -108,10 +128,14 @@ public class App
 		return null;
 	}
 
-	public ArrayList<String> buscaSps() {
-		// TODO Implementar metodo para retornar un listado las funciones que
-		// existen en la base de datos activa
-		return null;
+	public static ArrayList<String> buscaSps(String ddl) {
+		//Busca si hay declaraciones de procedimientos almacenados en un texto
+		ArrayList<String> spsEncontrados = new ArrayList<String>();
+		Matcher m = Pattern.compile("procedure.*.;").matcher(ddl);
+		while(m.find()){
+			spsEncontrados.add(m.group());
+		}
+		return spsEncontrados;
 	}
 
 	public void buscaTablas(String objeto) {
@@ -124,7 +148,12 @@ public class App
 		// dado un tipo de objeto (pkg,sp,func).
 	}
 	
-	public static void parsePkg(String ddlpkg){
+	public static void parsePkg(String obj, String ddlpkg){
 		//Parsea los paquetes en busca de sps, tablas y columnas
+		ArrayList<String> sps = buscaSps(ddlpkg);
+		for (String sp : sps) {
+			System.out.println(sp);
+		}
+		
 	}
 }
