@@ -16,22 +16,28 @@ public class App
         ArrayList<String> objs = null;
         
         
-        Connection conn;
+        Connection conn = null;
         try {
 			conn = getConn("FALA_SBX","hernan");
 			objs = getDbObject(conn, "PACKAGE");
 			
             //Recorrer los packages
-			for (String obj : objs) {
-				String ddl = getDDL(conn, "PACKAGE", obj);
-				parsePkg(obj, ddl);
-			}
+			//for (String obj : objs) {
+				System.out.println("sps del objeto: "+objs.get(0));
+				String ddl = getDDL(conn, "PACKAGE", objs.get(0));
+				parsePkg(objs.get(0), ddl);
+			//}
 			
 			
-			conn.close();
+			
 		} catch (SQLException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
+		}finally{
+			try {
+				conn.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
 		}
         
         
@@ -39,11 +45,12 @@ public class App
         
     }
 
-	public static String getDDL(Connection conn, String tipo, String obj){
+	public static String getDDL(Connection conn, String tipo, String obj) throws SQLException{
 		String labels_query = "select DBMS_METADATA.GET_DDL(?,?) from DUAL"; //PACKAGE,HAS_PKG_SFC
 		String ddl = null;
+		PreparedStatement statement = null;
 		try {
-			PreparedStatement statement = conn.prepareStatement(labels_query);
+			statement =  conn.prepareStatement(labels_query);
 			statement.setString(1, tipo);
 			statement.setString(2, obj);
 			ResultSet r = statement.executeQuery();
@@ -54,11 +61,9 @@ public class App
 		} catch (SQLException e) {
 			e.printStackTrace();
 		} finally{
-			try {
-				conn.close();
-			} catch (SQLException e) {
-				e.printStackTrace();
-			}
+			if (statement != null) {
+				statement.close();
+	        }
 		}
 		return ddl;
 	}
@@ -88,19 +93,20 @@ public class App
 		return conn;
 	}
 
-	public static ArrayList<String> getDbObject(Connection conn, String tobjeto) {
+	public static ArrayList<String> getDbObject(Connection conn, String tobjeto) throws SQLException {
 		// Las querys ir a buscarlas a un archivo Labels
 		String labels_query = "select object_name from user_objects where object_type = ? order by object_name asc";
 		ArrayList<String> objs = new ArrayList<String>();
+		PreparedStatement statement = null;
 		if(conn != null && tobjeto != null){ 
 			try {
-					PreparedStatement statement = conn.prepareStatement(labels_query);
+					statement = conn.prepareStatement(labels_query);
 					
 					if(tobjeto.equals("PACKAGE")){
 						statement.setString(1, "PACKAGE");
 					}else if(tobjeto.equals("PROCEDIMIENTO")){
 						statement.setString(1, "PROCEDURE");						
-					}
+					}//TODO continuar con los demas objetos
 					
 					ResultSet r = statement.executeQuery();
 					while(r.next()){
@@ -110,11 +116,9 @@ public class App
 				} catch (SQLException e) {
 					e.printStackTrace();
 				}finally{
-					try {
-						conn.close();
-					} catch (SQLException e) {
-						e.printStackTrace();
-					}
+					if (statement != null) {
+						statement.close();
+			        }
 				}
 		}
 		 
@@ -131,9 +135,15 @@ public class App
 	public static ArrayList<String> buscaSps(String ddl) {
 		//Busca si hay declaraciones de procedimientos almacenados en un texto
 		ArrayList<String> spsEncontrados = new ArrayList<String>();
-		Matcher m = Pattern.compile("procedure.*.;").matcher(ddl);
+		ddl.replaceAll("PROCEDURE", "procedure");
+		Matcher m = Pattern.compile("procedure.*.(.*.).*.;").matcher(ddl);
+		String sp = null;
 		while(m.find()){
-			spsEncontrados.add(m.group());
+			sp = m.group().substring(9, m.group().indexOf("("));
+			sp = sp.trim();
+			
+			spsEncontrados.add(sp);
+			//System.out.println(sp+" Inicio: "+m.start()+ " fin: "+m.end());
 		}
 		return spsEncontrados;
 	}
